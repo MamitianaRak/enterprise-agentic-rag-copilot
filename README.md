@@ -477,6 +477,9 @@ On the free plan the backend sleeps after 15 minutes of inactivity (the first re
 | POST | `/api/ingest/{domain}` | Admins: upload a document, form field `access` = groups allowed to retrieve it (empty: everyone); re-uploading the same file replaces it |
 | GET | `/api/documents/{domain}` | Documents the user's groups may retrieve |
 | DELETE | `/api/documents/{domain}/{filename}` | Admins: remove a document from the knowledge base |
+| GET | `/api/actions` | The user's proposed and decided actions (`?domain=` to filter) |
+| POST | `/api/actions/{id}/approve` | Execute a proposal of this user: opens the ticket, incident or HR case; no body |
+| POST | `/api/actions/{id}/reject` | Dismiss a proposal; nothing is created |
 
 Every route except the public ones needs `Authorization: Bearer <token>`: 401 without a valid token, 403 for a domain outside the account, 404 for another user's conversation. `POST /api/chat` and `POST /api/ingest` remain as aliases for the `hr` domain.
 
@@ -495,6 +498,26 @@ Every route except the public ones needs `Authorization: Bearer <token>`: 401 wi
 Passwords are hashed with PBKDF2-SHA256 (200,000 iterations, random salt) and compared in constant time; an unknown username costs the same time as a wrong password. `get_retriever` has no default for the groups, so a code path that forgot them would fail instead of searching everything. The in-memory LLM cache cannot leak a restricted answer across users: the answer prompt contains the retrieved evidence, so it differs as soon as the evidence does.
 
 `tests/test_auth.py` covers each rule, including an end-to-end check on the real graph: with the same question, the salary bands reach the LLM prompt for an HR manager and never for an employee.
+
+## Escalation with human approval
+
+Some answers should not end the conversation: a P1 outage, a SEV1 incident, a harassment report. The copilot then **proposes** an action under its answer, and nothing happens until the user approves it.
+
+| Domain | Proposed when | Action |
+|---|---|---|
+| IT Support | Triage P1 or P2, or no answer in the IT knowledge base | IT ticket with the triaged priority |
+| CloudOps | Triage SEV1 or SEV2 | Incident with the severity and service |
+| HR | A sensitive topic (harassment, discrimination, retaliation…), or no answer in the handbook | HR case, confidential for sensitive topics |
+
+How it is built (`app/services/actions.py`):
+
+- **The LLM never triggers an action.** A rule-based policy reads the agent's triage and outcome and decides whether to propose one, so the behavior is predictable and unit-tested case by case.
+- **The server stores the proposal with all its parameters.** The browser only gets an id back and approves by id, with no body: it cannot change the priority or the text of what will be executed.
+- **Only the requester decides, and only once.** Another user's proposal answers 404. The proposal is claimed with a conditional update before execution, so a double click or a retry never opens two tickets (409). Proposals expire after 24 hours.
+- **A ticketing outage is recoverable.** If the ticketing system fails, nothing was created and the proposal goes back to `proposed`, so the user can try again (502).
+- **The ticketing system is an interface.** `LocalTicketing` stores tickets in SQLite and returns references like `IT-1001`, `INC-1002`, `HR-1003`; a Jira or ServiceNow client would implement the same `create` method.
+
+`tests/test_actions.py` covers the policy for each domain and the approval flow: one ticket per approval, rejection, another user's attempt, expiry and an outage followed by a retry.
 
 
 ## Conversation Memory

@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import auth, chat, health, ingest, sessions
+from app.api import actions, auth, chat, health, ingest, sessions
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.services.actions import init_actions
 from app.services.audit import init_db
 from app.services.conversations import init_conversations
 from app.services.documents import init_documents
@@ -17,6 +18,7 @@ init_db()
 init_conversations()
 init_documents()
 init_users()
+init_actions()
 
 
 # API only: the web UI is the React app in frontend/ (Vite in dev, nginx or a static host in prod).
@@ -36,6 +38,7 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(ingest.router)
 app.include_router(sessions.router)
+app.include_router(actions.router)
 
 
 @app.get("/", include_in_schema=False)

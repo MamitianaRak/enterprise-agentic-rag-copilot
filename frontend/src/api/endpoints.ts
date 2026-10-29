@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { http } from './http'
 import {
+  actionSchema,
   conversationSchema,
   demoAccountSchema,
   domainsResponseSchema,
@@ -58,6 +59,12 @@ export const api = {
     body.append('access', access)
     const { data } = await http.post(`/ingest/${domain}`, body)
     return z.object({ file: z.string(), chunks: z.number(), access: z.array(z.string()) }).parse(data)
+  },
+
+  /** Approve or reject a proposal by id only: the server executes what it stored. */
+  async decideAction(id: string, decision: 'approve' | 'reject') {
+    const { data } = await http.post(`/actions/${enc(id)}/${decision}`)
+    return actionSchema.parse(data)
   },
 
   async deleteDocument(domain: string, filename: string) {
