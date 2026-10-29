@@ -48,14 +48,17 @@ def public_config() -> dict:
     return {"default": DEFAULT_DOMAIN, "domains": [d.public() for d in DOMAINS.values()]}
 
 
-def ask(domain: Domain, question: str, thread_id: str):
-    return domain.graph.invoke(initial_state(question), config=thread_config(domain.name, thread_id))
+def ask(domain: Domain, question: str, thread_id: str, access_groups: list[str]):
+    return domain.graph.invoke(
+        initial_state(question, access_groups), config=thread_config(domain.name, thread_id)
+    )
 
 
-def stream(domain: Domain, question: str, thread_id: str) -> Iterator[dict]:
+def stream(domain: Domain, question: str, thread_id: str, access_groups: list[str]) -> Iterator[dict]:
     """Yield the full state after each graph step; the last one is the final result."""
     return domain.graph.stream(
-        initial_state(question), config=thread_config(domain.name, thread_id), stream_mode="values"
+        initial_state(question, access_groups), config=thread_config(domain.name, thread_id),
+        stream_mode="values",
     )
 
 

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/MamitianaRak/enterprise-agentic-rag-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/MamitianaRak/enterprise-agentic-rag-copilot/actions/workflows/ci.yml)
 
-**Live demo:** https://enterprise-copilot-l6so.onrender.com (free hosting: the first request after a pause can take about a minute while the backend wakes up)
+**Live demo:** https://enterprise-copilot-l6so.onrender.com (free hosting: the first request after a pause can take about a minute while the backend wakes up). Sign in with one of the one-click demo accounts: the employee and the HR manager get different answers to *"What are the salary bands?"*, because the bands document is restricted to HR managers.
 
 A multi-domain **Agentic RAG** copilot for the enterprise, with one LangGraph workflow per domain:
 
@@ -10,7 +10,7 @@ A multi-domain **Agentic RAG** copilot for the enterprise, with one LangGraph wo
 - **IT Support**: assigns a ticket priority (P1-P4), answers from the IT handbook and service desk runbooks first, and never asks for passwords or MFA codes.
 - **CloudOps Incident Response**: triages incidents (severity, service, category) and answers from private runbooks, SOPs and postmortems first.
 
-An end-to-end Forward Deployed Engineer (FDE) project: a **LangGraph + FastAPI** backend (LLM gateway over Gemini, Groq, OpenRouter and Cloudflare; Pinecone; Tavily) with self-checked, cited answers and conversation memory, and a **React + TypeScript** frontend that streams the agent's reasoning live. Tested in CI, packaged with **Docker**, deployed on **Render**.
+An end-to-end Forward Deployed Engineer (FDE) project: a **LangGraph + FastAPI** backend (LLM gateway over Gemini, Groq, OpenRouter and Cloudflare; Pinecone; Tavily) with self-checked, cited answers and conversation memory, and a **React + TypeScript** frontend that streams the agent's reasoning live. Users sign in (JWT), see only the assistants of their account, and retrieve only the documents their groups may read. Tested in CI, packaged with **Docker**, deployed on **Render**.
 
 ## 1. Business Problem
 
@@ -80,8 +80,8 @@ Observe + Improve
 Employee / HR User
         ↓
 React + TypeScript Web UI
-        ↓ POST /api/chat/{domain}/stream   (Server-Sent Events: one event per agent step)
-FastAPI
+        ↓ POST /api/chat/{domain}/stream   (Bearer JWT; Server-Sent Events: one event per agent step)
+FastAPI  ── checks the token, the user's domain and the conversation's owner
         ↓
 LangGraph Agentic RAG Controller  ←→  SQLite (conversation memory, audit)
         ↓
@@ -89,6 +89,8 @@ LangGraph Agentic RAG Controller  ←→  SQLite (conversation memory, audit)
  ↓               ↓
 Private KB       Tavily Web Search
 Pinecone         (fallback only)
+(filtered on the
+ user's groups)
 (llama-text-embed-v2)
  └───────┬───────┘
          ↓
@@ -221,12 +223,14 @@ Each business domain has its **own LangGraph workflow** and its **own Pinecone n
 enterprise-agentic-rag-copilot/
 ├── app/                         Backend (FastAPI, API only)
 │   ├── api/
+│   │   ├── auth.py              Login, demo accounts, current user
 │   │   ├── chat.py              POST /api/chat/{domain} and /stream (SSE)
 │   │   ├── sessions.py          Conversation list and history
 │   │   ├── ingest.py            Document upload, list, delete
 │   │   ├── health.py            GET /api/health, GET /api/domains
 │   │   └── errors.py            Provider failures → actionable 503/504 messages
 │   ├── core/
+│   │   ├── auth.py              JWT, current user, domain and admin checks
 │   │   ├── config.py            Settings loaded from .env
 │   │   ├── llm.py               LLM gateway: LiteLLM Router, answer/fast lanes, cache
 │   │   └── logging.py
@@ -244,7 +248,7 @@ enterprise-agentic-rag-copilot/
 │   │   ├── it/                  IT Support workflow (same layout)
 │   │   ├── cloudops/            CloudOps incident-response workflow (same layout)
 │   │   └── registry.py          domain → workflow + namespace + UI settings
-│   ├── services/                audit, conversations, documents, ingestion (SQLite + Pinecone)
+│   ├── services/                users, audit, conversations, documents, ingestion (SQLite + Pinecone)
 │   └── main.py
 ├── frontend/                    React + TypeScript single-page app
 │   ├── src/
@@ -317,7 +321,9 @@ PINECONE_INDEX_NAME=enterprise-copilot
 EMBEDDING_MODEL=llama-text-embed-v2
 EMBEDDING_DIMENSION=768
 TAVILY_API_KEY=...
-ADMIN_API_KEY=change-me-in-production
+# Session tokens and the one-click demo accounts
+JWT_SECRET=change-me
+DEMO_ACCOUNTS=true
 ```
 
 See `.env.example` for the lane order, models, cooldown and cache settings.
@@ -332,7 +338,14 @@ python ingest_sample_kb.py --domain it
 python ingest_sample_kb.py --domain cloudops
 ```
 
-Each domain is indexed into its own Pinecone namespace (`HR_NAMESPACE`, `IT_NAMESPACE`, `CLOUDOPS_NAMESPACE`) in the same index.
+Each domain is indexed into its own Pinecone namespace (`HR_NAMESPACE`, `IT_NAMESPACE`, `CLOUDOPS_NAMESPACE`) in the same index. `compensation_bands_confidential.md` is indexed for the `hr-managers` group only; every other sample document is public (see [Access control](#access-control)).
+
+To create real accounts (and set `DEMO_ACCOUNTS=false`):
+
+```bash
+python create_user.py jdoe --name "Jane Doe" --domains hr,it --groups hr-managers
+python create_user.py ops-admin --role admin --domains hr,it,cloudops
+```
 
 ### Step 5 — Run the application (two terminals)
 
@@ -440,9 +453,9 @@ Steps:
 
 1. Push the repository to GitHub.
 2. In Render: **New → Blueprint**, select the repository. Render reads `render.yaml`.
-3. Enter the secrets when prompted: `GOOGLE_API_KEY`, `PINECONE_API_KEY`, `TAVILY_API_KEY`. `ADMIN_API_KEY` is generated; copy it from the backend's **Environment** tab to upload documents.
+3. Enter the secrets when prompted: `GOOGLE_API_KEY`, `PINECONE_API_KEY`, `TAVILY_API_KEY`. `JWT_SECRET` is generated; the backend refuses to start in production with the default one.
 4. After the first deploy, open both services and check their `.onrender.com` URLs. If Render added a suffix because a name was taken, update `VITE_API_BASE_URL` (frontend) and `CORS_ORIGINS` (backend), then redeploy both.
-5. Index the knowledge bases once, from your machine with the same `.env` values (the Pinecone index is shared): `python ingest_sample_kb.py --domain hr` and `--domain cloudops`.
+5. Index the knowledge bases once, from your machine with the same `.env` values (the Pinecone index is shared): `python ingest_sample_kb.py --domain hr`, `--domain it` and `--domain cloudops`. **Upgrading from a version without access control:** deploy first, then re-index. Chunks indexed before carry no `access` groups, so the filter matches none of them until they are re-indexed; indexing the restricted document before the new backend is live would expose it through the old one.
 
 On the free plan the backend sleeps after 15 minutes of inactivity (the first request then takes about a minute), and its SQLite data (conversations, audit) is reset on every restart or deploy. The Pinecone knowledge base is unaffected.
 
@@ -450,18 +463,39 @@ On the free plan the backend sleeps after 15 minutes of inactivity (the first re
 
 | Method | Route | Description |
 |---|---|---|
-| GET | `/api/health` | Service status |
-| GET | `/api/domains` | Available domains and their UI settings |
+| GET | `/api/health` | Service status (public) |
+| GET | `/api/domains` | Available domains and their UI settings (public) |
+| POST | `/api/auth/login` | `{"username", "password"}` → `{"access_token", "user"}` |
+| GET | `/api/auth/demo-accounts` | One-click demo accounts, empty when `DEMO_ACCOUNTS=false` (public) |
+| POST | `/api/auth/demo` | `{"account": "employee"}` (or `hr-manager`, `admin`) → token |
+| GET | `/api/auth/me` | The signed-in user, their domains and groups |
 | POST | `/api/chat/{domain}` | Ask a question (`{"question": "...", "thread_id": "..."}`) |
 | POST | `/api/chat/{domain}/stream` | Same, as Server-Sent Events: `start`, one `step` per trace line, then `result` or `error` |
 | GET | `/api/sessions/{domain}` | Previous conversations of a domain (title, turns, last update) |
 | GET | `/api/sessions/{domain}/{thread_id}` | Conversation history |
 | DELETE | `/api/sessions/{domain}/{thread_id}` | Forget a conversation |
-| POST | `/api/ingest/{domain}` | Upload a document (header `X-Admin-Key`); re-uploading the same file replaces it |
-| GET | `/api/documents/{domain}` | Documents indexed through the app |
-| DELETE | `/api/documents/{domain}/{filename}` | Remove a document from the knowledge base (header `X-Admin-Key`) |
+| POST | `/api/ingest/{domain}` | Admins: upload a document, form field `access` = groups allowed to retrieve it (empty: everyone); re-uploading the same file replaces it |
+| GET | `/api/documents/{domain}` | Documents the user's groups may retrieve |
+| DELETE | `/api/documents/{domain}/{filename}` | Admins: remove a document from the knowledge base |
 
-`POST /api/chat` and `POST /api/ingest` remain as aliases for the `hr` domain.
+Every route except the public ones needs `Authorization: Bearer <token>`: 401 without a valid token, 403 for a domain outside the account, 404 for another user's conversation. `POST /api/chat` and `POST /api/ingest` remain as aliases for the `hr` domain.
+
+## Access control
+
+| Rule | Where it is enforced |
+|---|---|
+| Every data route needs a signed-in user | `current_user` dependency: JWT (HS256) checked on each request; roles, domains and groups are read again from the database, so revoking a right takes effect immediately |
+| A user only uses the assistants of their account | 403 before the graph runs (`require_domain`) |
+| A conversation belongs to the user who started it | Listing, history, deletion and continuation check the owner; another user's thread answers 404, so its existence is not revealed. This closed an IDOR: before, a thread id was enough to read any conversation |
+| A restricted document is only retrieved for its groups | Each chunk carries its `access` groups in Pinecone metadata, and retrieval sends `{"access": {"$in": user_groups}}` **inside the vector query**: a forbidden chunk is never retrieved, never graded and never reaches the LLM. The rule does not depend on the model following an instruction |
+| Restricted file names stay hidden too | `GET /api/documents` lists only the documents the user's groups may retrieve |
+| Only admins change the knowledge base | `admin_user` dependency on upload and delete |
+| Every question is attributed | The audit log records the user with the question, the source used and the trace |
+
+Passwords are hashed with PBKDF2-SHA256 (200,000 iterations, random salt) and compared in constant time; an unknown username costs the same time as a wrong password. `get_retriever` has no default for the groups, so a code path that forgot them would fail instead of searching everything. The in-memory LLM cache cannot leak a restricted answer across users: the answer prompt contains the retrieved evidence, so it differs as soon as the evidence does.
+
+`tests/test_auth.py` covers each rule, including an end-to-end check on the real graph: with the same question, the salary bands reach the LLM prompt for an HR manager and never for an employee.
+
 
 ## Conversation Memory
 

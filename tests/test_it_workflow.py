@@ -9,7 +9,7 @@ USEFUL = {"status": "useful", "reason": "actionable"}
 
 
 def run(question):
-    return build_graph().invoke(initial_state(question), config={"recursion_limit": 50})
+    return build_graph().invoke(initial_state(question, ["all"]), config={"recursion_limit": 50})
 
 
 def test_ticket_priority_is_returned_as_triage(patch_rag):

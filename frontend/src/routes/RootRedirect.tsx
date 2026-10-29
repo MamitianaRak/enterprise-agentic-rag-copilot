@@ -2,12 +2,23 @@ import { Loader2, ServerCrash } from 'lucide-react'
 import { Navigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useDomains } from '@/hooks/queries'
+import { useAuthStore } from '@/stores/auth-store'
 
-/** "/" sends the user to the default domain once the backend has told us which one it is. */
+/** "/" sends the user to the default domain, or to the first one their account may use. */
 export function RootRedirect() {
   const { data, error, refetch, isFetching } = useDomains()
+  const allowed = useAuthStore((s) => s.user?.domains ?? [])
 
-  if (data) return <Navigate to={`/${data.default}`} replace />
+  if (data) {
+    const usable = data.domains.filter((d) => allowed.includes(d.name)).map((d) => d.name)
+    const target = usable.includes(data.default) ? data.default : usable[0]
+    if (target) return <Navigate to={`/${target}`} replace />
+    return (
+      <div className="flex h-dvh items-center justify-center p-6 text-center text-sm text-muted-foreground">
+        Your account has no access to any assistant yet. Ask an administrator.
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-dvh flex-col items-center justify-center gap-4 p-6 text-center">

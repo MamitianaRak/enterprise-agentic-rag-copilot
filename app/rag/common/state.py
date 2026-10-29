@@ -51,6 +51,7 @@ class AgentState(TypedDict):
     user_question: str  # raw message as typed by the user
     question: str       # standalone version, after contextualization
     current_query: str
+    access_groups: List[str]  # document groups of the asking user; retrieval filters on them
     kb_docs: List[Document]
     web_results: str
     kb_grade: str
@@ -79,12 +80,14 @@ class AgentState(TypedDict):
     memory: Annotated[List[MemoryTurn], operator.add]
 
 
-def initial_state(question: str) -> AgentState:
-    """Per-turn fields are reset; memory=[] adds nothing, so history is kept."""
+def initial_state(question: str, access_groups: List[str]) -> AgentState:
+    """Per-turn fields are reset; memory=[] adds nothing, so history is kept. The user's groups
+    are set on every turn, never inherited from an earlier turn of the thread."""
     return {
         "user_question": question,
         "question": question,
         "current_query": question,
+        "access_groups": list(access_groups),
         "kb_docs": [],
         "web_results": "",
         "kb_grade": "",
