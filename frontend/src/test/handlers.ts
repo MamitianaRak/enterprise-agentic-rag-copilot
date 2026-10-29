@@ -27,11 +27,36 @@ export const CHAT_RESULT = {
   usefulness: 'useful',
 }
 
+export const ADMIN_USER = {
+  username: 'admin',
+  display_name: 'Demo admin',
+  role: 'admin' as const,
+  domains: ['hr', 'it', 'cloudops'],
+  groups: ['hr-managers'],
+}
+
+export const EMPLOYEE_USER = {
+  username: 'alex',
+  display_name: 'Alex Martin (employee)',
+  role: 'employee' as const,
+  domains: ['hr', 'it'],
+  groups: [],
+}
+
 export function sse(events: Array<[string, unknown]>) {
   return events.map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).join('')
 }
 
 export const handlers = [
+  http.get('*/api/auth/demo-accounts', () =>
+    HttpResponse.json({
+      accounts: [
+        { account: 'employee', ...EMPLOYEE_USER },
+        { account: 'admin', ...ADMIN_USER },
+      ],
+    }),
+  ),
+  http.post('*/api/auth/demo', () => HttpResponse.json({ access_token: 'employee-token', user: EMPLOYEE_USER })),
   http.get('*/api/domains', () => HttpResponse.json({ default: 'hr', domains: [HR_DOMAIN] })),
   http.get('*/api/sessions/hr', () =>
     HttpResponse.json({

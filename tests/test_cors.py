@@ -17,7 +17,7 @@ def test_configured_origin_is_allowed_for_streaming_and_admin_calls():
         CORSMiddleware,
         allow_origins=["https://enterprise-copilot.onrender.com"],
         allow_methods=["GET", "POST", "DELETE"],
-        allow_headers=["Content-Type", "Accept", "X-Admin-Key"],
+        allow_headers=["Content-Type", "Accept", "Authorization"],
     )
 
     @api.get("/ping")
@@ -30,7 +30,7 @@ def test_configured_origin_is_allowed_for_streaming_and_admin_calls():
         headers={
             "Origin": "https://enterprise-copilot.onrender.com",
             "Access-Control-Request-Method": "DELETE",
-            "Access-Control-Request-Headers": "X-Admin-Key",
+            "Access-Control-Request-Headers": "Authorization",
         },
     )
     assert preflight.status_code == 200

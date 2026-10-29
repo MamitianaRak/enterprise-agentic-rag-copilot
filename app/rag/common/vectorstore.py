@@ -105,8 +105,17 @@ def get_vectorstore(namespace: str) -> PineconeVectorStore:
     return _stores[namespace]
 
 
-def get_retriever(namespace: str):
-    return get_vectorstore(namespace).as_retriever(search_kwargs={"k": settings.top_k})
+def access_filter(groups: list[str]) -> dict:
+    """Pinecone metadata filter: a chunk matches when one of its `access` groups is one of the
+    user's. Applied inside the vector query, so a forbidden chunk is never retrieved, never
+    graded and never reaches the LLM."""
+    return {"access": {"$in": sorted(set(groups))}}
+
+
+def get_retriever(namespace: str, groups: list[str]):
+    return get_vectorstore(namespace).as_retriever(
+        search_kwargs={"k": settings.top_k, "filter": access_filter(groups)}
+    )
 
 
 def add_documents(chunks, namespace: str, ids: list[str] | None = None):

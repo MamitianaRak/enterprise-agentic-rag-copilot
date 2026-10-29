@@ -49,7 +49,11 @@ class Settings(BaseSettings):
     max_support_retries: int = 1
     max_retrieval_rewrites: int = 1  # CloudOps: internal query rewrites before going to the web
     max_web_rewrites: int = 1
-    admin_api_key: str = "change-me-in-production"
+    # Auth: JWT signed with this secret (required in production). Demo accounts give the public
+    # demo one-click logins with different rights; turn them off for a real deployment.
+    jwt_secret: str = "dev-only-secret-change-me"
+    token_ttl_minutes: int = 480
+    demo_accounts: bool = True
     # Comma-separated origins allowed to call the API from a browser, e.g. the frontend's URL
     # when it is hosted separately. Empty = same-origin only (Vite proxy, nginx, docker compose).
     cors_origins: str = ""

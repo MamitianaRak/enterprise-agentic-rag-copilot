@@ -69,7 +69,20 @@ export const indexedDocumentSchema = z.object({
   filename: z.string(),
   chunks: z.number(),
   indexed_at: z.string(),
+  access: z.array(z.string()).default(['all']), // groups allowed to retrieve it
 })
+
+export const sessionUserSchema = z.object({
+  username: z.string(),
+  display_name: z.string(),
+  role: z.enum(['employee', 'admin']),
+  domains: z.array(z.string()),
+  groups: z.array(z.string()),
+})
+
+export const sessionSchema = z.object({ access_token: z.string(), user: sessionUserSchema })
+
+export const demoAccountSchema = sessionUserSchema.extend({ account: z.string() })
 
 export type DomainConfig = z.infer<typeof domainConfigSchema>
 export type DomainsResponse = z.infer<typeof domainsResponseSchema>
@@ -81,3 +94,5 @@ export type Triage = z.infer<typeof triageSchema>
 export type MemoryTurn = z.infer<typeof memoryTurnSchema>
 export type Conversation = z.infer<typeof conversationSchema>
 export type IndexedDocument = z.infer<typeof indexedDocumentSchema>
+export type SessionUser = z.infer<typeof sessionUserSchema>
+export type DemoAccount = z.infer<typeof demoAccountSchema>

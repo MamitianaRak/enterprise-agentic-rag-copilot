@@ -6,7 +6,6 @@ from collections import deque
 _tmp = tempfile.mkdtemp()
 os.environ["AUDIT_DB_PATH"] = os.path.join(_tmp, "audit_test.db")
 os.environ["MEMORY_DB_PATH"] = os.path.join(_tmp, "memory_test.db")
-os.environ["ADMIN_API_KEY"] = "test-admin-key"
 os.environ["MAX_RETRIES"] = "1"
 
 import json
@@ -48,11 +47,17 @@ class FakeLLM:
 
 
 class FakeRetriever:
-    def __init__(self, docs):
-        self.docs = docs
+    """Applies the same rule as the Pinecone filter: a chunk is returned only when one of its
+    `access` groups (public when absent) is one of the user's groups."""
+
+    calls: list = []
+
+    def __init__(self, docs, groups=("all",)):
+        self.docs, self.groups = docs, list(groups)
+        FakeRetriever.calls.append(self.groups)
 
     def invoke(self, query):
-        return self.docs
+        return [d for d in self.docs if set(d.metadata.get("access", ["all"])) & set(self.groups)]
 
 
 class FakeWebSearch:
@@ -78,7 +83,7 @@ def kb_docs():
 @pytest.fixture
 def patch_rag(monkeypatch, kb_docs):
     """Patch LLM, retriever and web search; returns a function that installs a FakeLLM."""
-    monkeypatch.setattr(nodes, "get_retriever", lambda namespace: FakeRetriever(kb_docs))
+    monkeypatch.setattr(nodes, "get_retriever", lambda namespace, groups: FakeRetriever(kb_docs, groups))
     monkeypatch.setattr(nodes, "web_search_tool", lambda: FakeWebSearch())
 
     def install(structured, text="fake answer"):

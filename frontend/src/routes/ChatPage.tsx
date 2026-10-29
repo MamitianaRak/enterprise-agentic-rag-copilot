@@ -11,7 +11,7 @@ import { useCurrentDomain } from '@/hooks/use-domain'
 /** /:domain (new chat) and /:domain/c/:threadId (existing conversation). */
 export function ChatPage() {
   const navigate = useNavigate()
-  const { domains, domain, domainName, threadId } = useCurrentDomain()
+  const { domains, domain, domainName, threadId, loaded } = useCurrentDomain()
 
   const onThreadCreated = useCallback(
     (id: string) => navigate(`/${domainName}/c/${id}`, { replace: true }),
@@ -32,7 +32,7 @@ export function ChatPage() {
     if (domain) document.title = `${domain.label} · Enterprise Copilot`
   }, [domain])
 
-  if (domains.length && !domain) return <Navigate to="/" replace />
+  if (loaded && !domain) return <Navigate to="/" replace />
   if (!domain) return null
 
   return (

@@ -206,7 +206,7 @@ def router_node(prompt: str):
 
 def retrieve_node(namespace: str):
     def retrieve_kb(state: AgentState):
-        docs = get_retriever(namespace).invoke(state["current_query"])
+        docs = get_retriever(namespace, state["access_groups"]).invoke(state["current_query"])
         return {"kb_docs": docs, "trace": add_trace(state, f"Private KB retrieval → {len(docs)} chunks")}
     return retrieve_kb
 
@@ -376,7 +376,7 @@ def triage_node(prompt: str):
 
 def retrieve_candidates_node(namespace: str):
     def retrieve_internal(state: AgentState):
-        docs = get_retriever(namespace).invoke(state["current_query"])
+        docs = get_retriever(namespace, state["access_groups"]).invoke(state["current_query"])
         return {
             "candidate_docs": docs,
             "relevant_docs": [],

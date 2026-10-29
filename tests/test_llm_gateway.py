@@ -186,9 +186,9 @@ def test_only_answers_use_the_answer_lane(monkeypatch, kb_docs):
     answer = RecordingLane(["20 days."])
     monkeypatch.setattr(nodes, "fast_llm", lambda: fast)
     monkeypatch.setattr(nodes, "answer_llm", lambda: answer)
-    monkeypatch.setattr(nodes, "get_retriever", lambda namespace: FakeRetriever(kb_docs))
+    monkeypatch.setattr(nodes, "get_retriever", lambda namespace, groups: FakeRetriever(kb_docs, groups))
 
-    result = build_hr_graph().invoke(initial_state("How many annual leave days?"))
+    result = build_hr_graph().invoke(initial_state("How many annual leave days?", ["all"]))
 
     assert result["answer"] == "20 days."
     assert len(answer.prompts) == 1 and "Answer ONLY from the private company HR KB" in answer.prompts[0]
