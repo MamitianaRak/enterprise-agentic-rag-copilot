@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from app.api.errors import to_http_error
 from app.core.auth import current_user, require_domain
 from app.rag.registry import DEFAULT_DOMAIN, Domain, ask, get_domain, stream
+from app.services.actions import propose
 from app.services.audit import write_audit
 from app.services.conversations import conversation_owner, touch_conversation
 from app.services.users import User
@@ -61,6 +62,8 @@ def finish_chat(domain: Domain, question: str, thread_id: str, result: dict, use
         "support_status": result.get("support_status", ""),
         "usefulness": result.get("usefulness", ""),
         "triage": result.get("triage"),  # CloudOps: severity, service, category; None for HR
+        # An escalation to approve (ticket, incident, HR case), or None: see app/services/actions.py.
+        "proposed_action": propose(domain.name, thread_id, user.username, question, result),
     }
 
 

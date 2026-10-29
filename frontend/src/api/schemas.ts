@@ -36,6 +36,19 @@ export const triageSchema = z.object({
   category: z.string(),
 })
 
+/** An escalation the agent proposes after its answer; nothing happens until the user approves. */
+export const actionSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['it_ticket', 'incident', 'hr_case']),
+  label: z.string(),
+  status: z.enum(['proposed', 'approved', 'executed', 'rejected']),
+  title: z.string(),
+  priority: z.string(),
+  reason: z.string(),
+  reference: z.string(),
+  created_at: z.string(),
+})
+
 export const chatResponseSchema = z.object({
   domain: z.string(),
   thread_id: z.string(),
@@ -48,6 +61,7 @@ export const chatResponseSchema = z.object({
   support_status: z.enum(['fully_supported', 'partially_supported', 'no_support', '']),
   usefulness: z.string(),
   triage: triageSchema.nullish(),
+  proposed_action: actionSchema.nullish(),
 })
 
 export const memoryTurnSchema = z.object({
@@ -95,4 +109,5 @@ export type MemoryTurn = z.infer<typeof memoryTurnSchema>
 export type Conversation = z.infer<typeof conversationSchema>
 export type IndexedDocument = z.infer<typeof indexedDocumentSchema>
 export type SessionUser = z.infer<typeof sessionUserSchema>
+export type ProposedAction = z.infer<typeof actionSchema>
 export type DemoAccount = z.infer<typeof demoAccountSchema>
