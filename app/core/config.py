@@ -42,7 +42,9 @@ class Settings(BaseSettings):
     embedding_model: str = "llama-text-embed-v2"
     embedding_dimension: int = 768
     max_context_chars: int = 12000
-    top_k: int = 4
+    # Retrieve wide, then let the relevance grading filter: with 4, a multi-part question ("which severity, and who
+    # do I page?") lost the section answering its second part, ranked 6th behind same-keyword runbooks (evals/).
+    top_k: int = 6
     max_retries: int = 1
     max_support_retries: int = 1
     max_retrieval_rewrites: int = 1  # CloudOps: internal query rewrites before going to the web

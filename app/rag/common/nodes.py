@@ -2,6 +2,7 @@
 and returns a node function, so every domain can assemble its own graph."""
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Literal
 from langchain_core.documents import Document
@@ -180,8 +181,24 @@ def commit_memory(state: AgentState):
 
 # ---- Nodes ----
 
+# A bare greeting or thanks never needs the knowledge base. Matched before the LLM router: the fast
+# model once sent "Hi there!" to retrieval, costing 9 LLM calls for an "insufficient evidence" reply (evals/).
+SMALL_TALK = re.compile(
+    r"(hi|hello|hey|good (morning|afternoon|evening)|bonjour|salut|bonsoir|"
+    r"thanks?|thank you|thx|merci|ok|okay|bye|goodbye|au revoir)"
+    r"( there| (so|very) much| beaucoup| a lot)?[\s!.,:)]*",
+    re.IGNORECASE,
+)
+
+
+def is_small_talk(question: str) -> bool:
+    return SMALL_TALK.fullmatch(question.strip()) is not None
+
+
 def router_node(prompt: str):
     def route_question(state: AgentState):
+        if is_small_talk(state["question"]):
+            return {"source_used": "direct", "trace": add_trace(state, "Router → DIRECT (small talk, no LLM call)")}
         decision, fb = structured(RouteDecision, prompt.format(question=state["question"]), RouteDecision(route="kb"))
         return {"source_used": decision.route, "trace": add_trace(state, f"Router → {decision.route.upper()}{fallback_note(fb)}")}
     return route_question
@@ -443,12 +460,23 @@ def rewrite_web_node(prompt: str):
     return rewrite_web
 
 
+def with_triage(question: str, triage: dict | None) -> str:
+    """The question, with the severity triage already assigned. Without it, the answer could take the severity of a
+    past incident found in the evidence (a SEV2 postmortem) for the current one, and contradict the triage badge."""
+    severity = (triage or {}).get("severity")
+    if not severity or severity == "none":
+        return question
+    service = f", service {triage['service']}" if triage.get("service") else ""
+    return (f"{question}\n(Triage of this request: {severity}{service}. Keep the answer consistent with it; "
+            "an incident described in the evidence is history, not the current severity.)")
+
+
 def generate_evidence_node(prompt: str):
     def generate_from_evidence(state: AgentState):
         docs = state["relevant_docs"]
         context = format_docs(docs)
         source = "private_kb" if state["source_mode"] == "internal" else "web_search"
-        answer = write(prompt.format(question=state["question"], context=context))
+        answer = write(prompt.format(question=with_triage(state["question"], state.get("triage")), context=context))
         return {
             "answer": answer,
             "source_used": source,
