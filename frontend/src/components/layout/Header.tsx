@@ -1,8 +1,9 @@
-import { ListTree, Menu } from 'lucide-react'
+import { ListTree, LogOut, Menu } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import type { DomainConfig } from '@/api/schemas'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useSession } from '@/hooks/use-auth'
 import { useAppStore } from '@/stores/app-store'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -10,6 +11,7 @@ export function Header({ domains, current }: { domains: DomainConfig[]; current:
   const navigate = useNavigate()
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen)
   const setInspectorOpen = useAppStore((s) => s.setInspectorOpen)
+  const { user, signOut } = useSession()
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b px-3 sm:px-4">
@@ -36,6 +38,16 @@ export function Header({ domains, current }: { domains: DomainConfig[]; current:
           <ListTree />
         </Button>
         <ThemeToggle />
+        {user ? (
+          <div className="ml-1 flex items-center gap-1 border-l pl-2">
+            <span className="hidden max-w-48 truncate text-sm text-muted-foreground lg:inline" title={user.display_name}>
+              {user.display_name}
+            </span>
+            <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sign out" title="Sign out">
+              <LogOut />
+            </Button>
+          </div>
+        ) : null}
       </div>
     </header>
   )

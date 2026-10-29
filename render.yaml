@@ -28,8 +28,10 @@ services:
         sync: false
       - key: TAVILY_API_KEY
         sync: false
-      - key: ADMIN_API_KEY
-        generateValue: true  # random value; read it in the dashboard to upload documents
+      - key: JWT_SECRET
+        generateValue: true  # random value signing the session tokens
+      - key: DEMO_ACCOUNTS
+        value: "true"  # one-click employee / HR manager / admin logins on the public demo
       - key: LANGSMITH_API_KEY
         sync: false
       # LangSmith tracing of every LangGraph run (picked up automatically by LangChain).

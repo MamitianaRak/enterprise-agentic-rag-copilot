@@ -53,7 +53,7 @@ def run_case(case: dict, run_id: str) -> dict:
     config["tags"] = ["eval", run_id]
     started = time.perf_counter()
     try:
-        state = domain.graph.invoke(initial_state(case["question"]), config=config)
+        state = domain.graph.invoke(initial_state(case["question"], case.get("groups", ["all"])), config=config)
         error = None
     except Exception as exc:  # a provider outage or quota is recorded, not hidden
         state, error = {}, f"{type(exc).__name__}: {exc}"

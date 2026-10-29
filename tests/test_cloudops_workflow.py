@@ -10,7 +10,7 @@ TRIAGE_KB = {"route": "kb", "severity": "SEV2", "service": "checkout-api", "cate
 
 
 def run(question):
-    return build_graph().invoke(initial_state(question), config={"recursion_limit": 50})
+    return build_graph().invoke(initial_state(question, ["all"]), config={"recursion_limit": 50})
 
 
 def test_greeting_goes_direct(patch_rag):
@@ -101,11 +101,11 @@ def test_follow_up_keeps_incident_context(patch_rag, tmp_path):
     graph = build_graph(SqliteSaver(sqlite3.connect(str(tmp_path / "m.db"), check_same_thread=False)))
     config = thread_config("cloudops", "incident-1")
     patch_rag([TRIAGE_KB, {"relevant": [1]}, FULL, USEFUL], text="Check readiness probes first.")
-    graph.invoke(initial_state("checkout-api 502 after deploy"), config=config)
+    graph.invoke(initial_state("checkout-api 502 after deploy", ["all"]), config=config)
 
     fake = patch_rag([{"query": "What to check next if checkout-api 502 persists after readiness checks?"},
                       TRIAGE_KB, {"relevant": [1]}, FULL, USEFUL])
-    second = graph.invoke(initial_state("What should I check next?"), config=config)
+    second = graph.invoke(initial_state("What should I check next?", ["all"]), config=config)
     assert "User: checkout-api 502 after deploy" in fake.prompts[0]
     assert second["question"].startswith("What to check next if checkout-api 502")
     assert len(second["memory"]) == 2

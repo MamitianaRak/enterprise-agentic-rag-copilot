@@ -2,9 +2,17 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 from app.api import chat
+from app.core.auth import create_token
 from app.main import app
+from app.services.users import DEMO_ACCOUNTS
 
-client = TestClient(app)
+
+def bearer(account: str) -> dict:
+    return {"Authorization": f"Bearer {create_token(DEMO_ACCOUNTS[account])}"}
+
+
+# The demo admin can use every domain; access rules are tested in test_auth.py.
+client = TestClient(app, headers=bearer("admin"))
 
 FAKE_RESULT = {
     "answer": "20 days.",
@@ -20,7 +28,7 @@ FAKE_RESULT = {
 def fake_ask(monkeypatch):
     calls = []
 
-    def ask(domain, question, thread_id):
+    def ask(domain, question, thread_id, access_groups):
         calls.append((domain.name, question, thread_id))
         return FAKE_RESULT
 
@@ -47,7 +55,7 @@ def test_domains_expose_ui_config():
 
 def test_cloudops_chat_returns_triage(monkeypatch):
     triage = {"severity": "SEV2", "service": "checkout-api", "category": "deployment"}
-    monkeypatch.setattr(chat, "ask", lambda domain, question, thread_id: {**FAKE_RESULT, "triage": triage})
+    monkeypatch.setattr(chat, "ask", lambda domain, question, thread_id, groups: {**FAKE_RESULT, "triage": triage})
     res = client.post("/api/chat/cloudops", json={"question": "checkout 502", "thread_id": "inc-1"})
     assert res.status_code == 200
     assert res.json()["domain"] == "cloudops" and res.json()["triage"] == triage
@@ -68,7 +76,7 @@ def test_chat_stream_sends_steps_then_result(monkeypatch):
         {"trace": ["Memory → new conversation", "Router → KB"]},
         {**FAKE_RESULT, "trace": ["Memory → new conversation", "Router → KB", "Answer generation → PRIVATE KB"]},
     ]
-    monkeypatch.setattr(chat, "stream", lambda domain, question, thread_id: iter(states))
+    monkeypatch.setattr(chat, "stream", lambda domain, question, thread_id, groups: iter(states))
     res = client.post("/api/chat/hr/stream", json={"question": "leave days", "thread_id": "stream-1"})
     assert res.status_code == 200
     assert res.headers["content-type"].startswith("text/event-stream")
@@ -81,7 +89,7 @@ def test_chat_stream_sends_steps_then_result(monkeypatch):
 
 
 def test_chat_stream_reports_errors_as_events(monkeypatch):
-    def failing(domain, question, thread_id):
+    def failing(domain, question, thread_id, groups):
         raise RuntimeError("429 RESOURCE_EXHAUSTED")
         yield  # pragma: no cover
 
@@ -148,9 +156,9 @@ def test_unknown_domain_is_404(fake_ask):
     assert fake_ask == []
 
 
-def test_ingest_requires_admin_key():
-    res = client.post("/api/ingest/hr", files={"file": ("a.txt", b"hello")}, headers={"X-Admin-Key": "wrong"})
-    assert res.status_code == 401
+def test_ingest_requires_an_admin():
+    res = client.post("/api/ingest/hr", files={"file": ("a.txt", b"hello")}, headers=bearer("employee"))
+    assert res.status_code == 403
 
 
 def test_root_points_to_docs():

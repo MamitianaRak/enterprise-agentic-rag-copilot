@@ -36,6 +36,19 @@ export const triageSchema = z.object({
   category: z.string(),
 })
 
+/** An escalation the agent proposes after its answer; nothing happens until the user approves. */
+export const actionSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['it_ticket', 'incident', 'hr_case']),
+  label: z.string(),
+  status: z.enum(['proposed', 'approved', 'executed', 'rejected']),
+  title: z.string(),
+  priority: z.string(),
+  reason: z.string(),
+  reference: z.string(),
+  created_at: z.string(),
+})
+
 export const chatResponseSchema = z.object({
   domain: z.string(),
   thread_id: z.string(),
@@ -48,6 +61,7 @@ export const chatResponseSchema = z.object({
   support_status: z.enum(['fully_supported', 'partially_supported', 'no_support', '']),
   usefulness: z.string(),
   triage: triageSchema.nullish(),
+  proposed_action: actionSchema.nullish(),
 })
 
 export const memoryTurnSchema = z.object({
@@ -69,7 +83,20 @@ export const indexedDocumentSchema = z.object({
   filename: z.string(),
   chunks: z.number(),
   indexed_at: z.string(),
+  access: z.array(z.string()).default(['all']), // groups allowed to retrieve it
 })
+
+export const sessionUserSchema = z.object({
+  username: z.string(),
+  display_name: z.string(),
+  role: z.enum(['employee', 'admin']),
+  domains: z.array(z.string()),
+  groups: z.array(z.string()),
+})
+
+export const sessionSchema = z.object({ access_token: z.string(), user: sessionUserSchema })
+
+export const demoAccountSchema = sessionUserSchema.extend({ account: z.string() })
 
 export type DomainConfig = z.infer<typeof domainConfigSchema>
 export type DomainsResponse = z.infer<typeof domainsResponseSchema>
@@ -81,3 +108,6 @@ export type Triage = z.infer<typeof triageSchema>
 export type MemoryTurn = z.infer<typeof memoryTurnSchema>
 export type Conversation = z.infer<typeof conversationSchema>
 export type IndexedDocument = z.infer<typeof indexedDocumentSchema>
+export type SessionUser = z.infer<typeof sessionUserSchema>
+export type ProposedAction = z.infer<typeof actionSchema>
+export type DemoAccount = z.infer<typeof demoAccountSchema>

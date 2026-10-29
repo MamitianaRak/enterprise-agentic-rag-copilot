@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import type { ChatMessage } from '@/hooks/use-chat'
 import { nextStatus } from '@/lib/trace'
 import { cn } from '@/lib/utils'
+import { ActionCard } from './ActionCard'
 import { Citations } from './Citations'
 import { Markdown } from './Markdown'
 import { SourceBadges } from './SourceBadges'
@@ -77,6 +78,7 @@ export function MessageItem({ message, webWarning, selected, onShowTrace }: Prop
               </p>
             )}
             <Citations citations={message.citations} />
+            {message.response?.proposed_action ? <ActionCard proposal={message.response.proposed_action} /> : null}
             <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2">
               <SourceBadges source={message.sourceUsed} support={message.response?.support_status} />
               <div className="flex items-center gap-1">

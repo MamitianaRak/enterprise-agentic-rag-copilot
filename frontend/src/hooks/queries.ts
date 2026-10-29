@@ -9,6 +9,10 @@ export const queryKeys = {
   documents: (domain: string) => ['documents', domain] as const,
 }
 
+export function useDemoAccounts() {
+  return useQuery({ queryKey: ['demo-accounts'], queryFn: api.demoAccounts, staleTime: Infinity })
+}
+
 export function useDomains() {
   return useQuery({ queryKey: queryKeys.domains, queryFn: api.domains, staleTime: Infinity })
 }
@@ -45,7 +49,7 @@ export function useDocuments(domain: string, enabled = true) {
 export function useUploadDocument(domain: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ file, adminKey }: { file: File; adminKey: string }) => api.uploadDocument(domain, file, adminKey),
+    mutationFn: ({ file, access }: { file: File; access: string }) => api.uploadDocument(domain, file, access),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.documents(domain) })
       toast.success(`Indexed ${data.file}`, { description: `${data.chunks} chunks added to the knowledge base.` })
@@ -57,8 +61,7 @@ export function useUploadDocument(domain: string) {
 export function useDeleteDocument(domain: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ filename, adminKey }: { filename: string; adminKey: string }) =>
-      api.deleteDocument(domain, filename, adminKey),
+    mutationFn: ({ filename }: { filename: string }) => api.deleteDocument(domain, filename),
     onSuccess: (_, { filename }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.documents(domain) })
       toast.success(`Removed ${filename}`)

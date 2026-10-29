@@ -18,7 +18,7 @@ NOT_USEFUL = {"status": "not_useful", "reason": "off topic"}
 
 
 def run(question):
-    return build_graph().invoke(initial_state(question))
+    return build_graph().invoke(initial_state(question, ["all"]))
 
 
 def test_greeting_goes_direct_without_calling_the_router(patch_rag):
@@ -126,13 +126,13 @@ def test_follow_up_question_uses_memory(patch_rag, tmp_path):
     config = thread_config("hr", "thread-1")
 
     patch_rag([{"route": "kb"}, {"grade": "good"}, FULL, USEFUL], text="20 annual leave days.")
-    graph.invoke(initial_state("How many annual leave days do I get?"), config=config)
+    graph.invoke(initial_state("How many annual leave days do I get?", ["all"]), config=config)
 
     fake = patch_rag(
         [{"query": "How many sick leave days do employees get?"}, {"route": "kb"}, {"grade": "good"}, FULL, USEFUL],
         text="10 sick days.",
     )
-    second = graph.invoke(initial_state("And for sick leave?"), config=config)
+    second = graph.invoke(initial_state("And for sick leave?", ["all"]), config=config)
 
     # The contextualizer saw the previous turn and produced a standalone question.
     assert "User: How many annual leave days do I get?" in fake.prompts[0]
@@ -146,7 +146,7 @@ def test_follow_up_question_uses_memory(patch_rag, tmp_path):
 
     # Another thread starts fresh.
     patch_rag([{"route": "direct"}], text="Hi")
-    other = graph.invoke(initial_state("Hello"), config=thread_config("hr", "thread-2"))
+    other = graph.invoke(initial_state("Hello", ["all"]), config=thread_config("hr", "thread-2"))
     assert len(other["memory"]) == 1
     con.close()
 

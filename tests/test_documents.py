@@ -2,11 +2,13 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from app.api.errors import to_http_error
+from app.core.auth import create_token
 from app.main import app
 from app.services import ingestion
+from app.services.users import DEMO_ACCOUNTS
 
 client = TestClient(app)
-ADMIN = {"X-Admin-Key": "test-admin-key"}
+ADMIN = {"Authorization": f"Bearer {create_token(DEMO_ACCOUNTS['admin'])}"}
 
 
 @pytest.fixture
@@ -40,7 +42,7 @@ def test_upload_list_and_delete_document(fake_pinecone):
     res = upload("leave.md", "Employees receive 20 annual leave days.")
     assert res.status_code == 200 and res.json()["chunks"] == 1
 
-    docs = client.get("/api/documents/hr").json()["documents"]
+    docs = client.get("/api/documents/hr", headers=ADMIN).json()["documents"]
     assert [d["filename"] for d in docs if d["filename"] == "leave.md"] == ["leave.md"]
     chunk = next(iter(fake_pinecone["vectors"].values()))
     assert chunk.metadata["filename"] == "leave.md" and chunk.metadata["domain"] == "hr"
@@ -48,7 +50,8 @@ def test_upload_list_and_delete_document(fake_pinecone):
     res = client.delete("/api/documents/hr/leave.md", headers=ADMIN)
     assert res.status_code == 200
     assert fake_pinecone["vectors"] == {}
-    assert "leave.md" not in [d["filename"] for d in client.get("/api/documents/hr").json()["documents"]]
+    listed = client.get("/api/documents/hr", headers=ADMIN).json()["documents"]
+    assert "leave.md" not in [d["filename"] for d in listed]
 
 
 def test_reupload_replaces_instead_of_duplicating(fake_pinecone):
