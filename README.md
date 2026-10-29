@@ -373,6 +373,42 @@ npm run typecheck
 | Frontend | `oxlint`, `tsc`, Vitest, production build |
 | Docker | Builds both images (after the two test jobs pass), with layer caching |
 
+## Evaluation
+
+The unit tests use a fake LLM, so they prove the graph is wired correctly but say nothing about answer quality. `evals/` runs a versioned set of 32 questions (HR 11, IT 12, CloudOps 9) against the real agent: real models, Pinecone and Tavily, one fresh conversation per question.
+
+Each case states what a correct answer must contain, and deterministic code checks it. There is no LLM judge, so a score can be re-run and trusted.
+
+| Check | What it verifies |
+|---|---|
+| Source | The agent chose the expected path: private KB, web, direct reply, or "insufficient evidence" |
+| Document | The expected policy or runbook is among the cited sources |
+| Facts | Every required fact appears in the answer (accepted spellings listed per fact) |
+| Guardrails | Dangerous advice (e.g. "disable the firewall") is absent, unless it is negated |
+| Severity | IT priority (P1 to P4) and CloudOps severity (SEV1 to SEV4) match the expected level |
+
+```bash
+python -m evals.run                         # full set, about 12 minutes on free tiers
+python -m evals.run --domain cloudops       # one domain
+python -m evals.run --case co-sev1-paging   # one case, repeatable
+python -m evals.run --min-pass 0.9          # exit 1 below 90% (regression gate)
+```
+
+The last full run is in [`evals/results/latest.md`](evals/results/latest.md), with every case, latency and LLM calls per question. With `LANGSMITH_TRACING=true`, each run is also traced in LangSmith and tagged with its run id.
+
+### What the evaluation found
+
+| Run | Passing | Failure | Fix |
+|---|---|---|---|
+| 1 | 31 / 32 | `co-sev1-paging`: the answer said SEV2 and missed who to page | `TOP_K` 4 → 6, triage passed to generation |
+| 2 | 31 / 32 | `hr-greeting`: "Hi there!" routed to retrieval, 9 LLM calls for an "insufficient evidence" reply | Plain greetings and thanks answered without the LLM router |
+
+- **SEV1 paging.** The question asked two things: the severity, and who to page. With 4 retrieved chunks, the section on paging ranked 6th behind runbooks sharing the same keywords. The answer then copied SEV2 from a postmortem, contradicting the SEV1 triage. Retrieving 6 chunks and giving the triage result to the generation step fixed it.
+- **Greeting.** The fast model routed "Hi there!" correctly in run 1 and wrongly in run 2. A small rule now catches bare greetings before the router, so that case always costs one call. The two greeting cases were re-run after the fix and passed; the full set has not been re-run since.
+- **Evaluator.** One failure in a single-case rerun came from the checker, not the agent: the answer wrote "SEV 1" and the check expected "SEV1". Equivalent spellings are now normalized, with tests in `tests/test_eval.py`.
+
+Each run fails on a different case, which shows that free-tier models are not fully deterministic. The CI gate is therefore set at 90%, which allows 3 failures out of 32. Above that, failures point to a regression, not noise. `.github/workflows/eval.yml` runs the set by hand before merging a prompt, model or retrieval change, and every Monday to catch drift on the provider side. It needs these repository secrets: `GOOGLE_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `PINECONE_API_KEY`, `TAVILY_API_KEY`, optionally `LANGSMITH_API_KEY`. It also needs these variables: `PINECONE_INDEX_NAME`, `HR_NAMESPACE`, `CLOUDOPS_NAMESPACE`.
+
 ## Docker (deployment)
 
 Two images, one per service:

@@ -229,3 +229,6 @@ data/*.db-*
 *.sqlite3
 uploads/*
 !uploads/.gitkeep
+
+# Evaluation runs: one JSON per run stays local, latest.md (last full run) is committed
+evals/results/*.json

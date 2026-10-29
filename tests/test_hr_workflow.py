@@ -21,17 +21,24 @@ def run(question):
     return build_graph().invoke(initial_state(question))
 
 
-def test_greeting_goes_direct(patch_rag):
-    patch_rag([{"route": "direct"}], text="Hello!")
+def test_greeting_goes_direct_without_calling_the_router(patch_rag):
+    patch_rag([], text="Hello!")
     result = run("Hi there")
     assert result["source_used"] == "direct"
     assert result["answer"] == "Hello!"
     assert result["trace"] == [
         "Memory → new conversation",
-        "Router → DIRECT",
+        "Router → DIRECT (small talk, no LLM call)",
         "Direct response → no retrieval",
         "Memory → conversation saved",
     ]
+
+
+def test_casual_chat_is_routed_direct_by_the_llm(patch_rag):
+    patch_rag([{"route": "direct"}], text="Doing well, thanks!")
+    result = run("How are you doing today?")
+    assert result["source_used"] == "direct"
+    assert result["trace"][1] == "Router → DIRECT"
 
 
 def test_good_kb_evidence_answers_from_private_kb(patch_rag):
